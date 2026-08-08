@@ -1,2 +1,5 @@
 discord.py
 Flask
+yt-dlp
+PyNaCl
+static-ffmpeg
