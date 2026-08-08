@@ -6,6 +6,19 @@ import asyncio
 import static_ffmpeg
 import os
 
+app = Flask('')
+
+@app.route('/')
+def home():
+    return "Bot is alive!"
+
+def run_web_server():
+    port = int(os.getenv("PORT", 8080))
+    app.run(host='0.0.0.0', port=port)
+
+# This starts the web server in the background so Render stays happy
+Thread(target=run_web_server).start() 
+
 # ==================== CONFIGURATION BOX ====================
 # Tell your owner to change this number to whatever server ID she wants to use!
 TEST_SERVER_ID = 1529453134634811463  
