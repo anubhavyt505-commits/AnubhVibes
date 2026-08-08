@@ -37,6 +37,14 @@ YTDL_OPTIONS = {
     'no_warnings': True,
     'default_search': 'ytsearch', 
     'source_address': '0.0.0.0',
+    'nocheckcertificate': True,
+    'extruct': True,
+    'http_chunk_size': 1048576,
+    'headers': {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.9',
+    }
 }
 
 FFMPEG_OPTIONS = {
@@ -128,9 +136,11 @@ async def play(interaction: discord.Interaction, search: str):
                 video_data = info
 
             video_title = video_data.get('title', 'Music Video')
-            video_url = video_data.get('webpage_url', f"https://youtube.com/watch?v={video_data.get('id')}")
+            video_url = video_data.get('webpage_url', f"https://youtube.com{video_data.get('id')}")
             
     except Exception as e:
+        # Prints out the true technical YouTube blocking error straight to your Render log dashboard terminal
+        print(f"❌ TECHNICAL YT-DLP ERROR CAUGHT IN LOGS: {e}")
         await interaction.followup.send("❌ Search Error: Video tracking target broken or blocked.")
         return
 
@@ -181,3 +191,4 @@ async def stop(interaction: discord.Interaction):
         await interaction.response.send_message("❌ **I am not inside a voice channel!**", ephemeral=True)
 
 bot.run(os.environ.get('DISCORD_TOKEN'))
+
