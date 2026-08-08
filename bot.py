@@ -35,7 +35,7 @@ YTDL_OPTIONS = {
     'noplaylist': True,
     'quiet': True,
     'no_warnings': True,
-    'default_search': 'ytsearch', 
+    'default_search': 'scsearch', 
     'source_address': '0.0.0.0',
     'nocheckcertificate': True,
     'extruct': True,
