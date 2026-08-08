@@ -5,9 +5,10 @@ import yt_dlp
 import asyncio
 import static_ffmpeg
 import os
-from flask import Flask   
+from flask import Flask
 from threading import Thread
 
+# Initialize Flask server so Render free tier remains responsive
 app = Flask('')
 
 @app.route('/')
@@ -18,18 +19,15 @@ def run_web_server():
     port = int(os.getenv("PORT", 8080))
     app.run(host='0.0.0.0', port=port)
 
-# This starts the web server in the background so Render stays happy
 Thread(target=run_web_server).start() 
 
 # ==================== CONFIGURATION BOX ====================
-# Tell your owner to change this number to whatever server ID she wants to use!
 TEST_SERVER_ID = 1529453134634811463  
 # ===========================================================
 
 intents = discord.Intents.default()
 bot = commands.Bot(command_prefix="!", intents=intents)
 
-# Global tracking system for the song loop state per server
 server_playback_states = {}
 
 YTDL_OPTIONS = {
@@ -48,19 +46,14 @@ FFMPEG_OPTIONS = {
 
 @bot.event
 async def on_ready():
-    # Instantly points python to the cloud-managed FFmpeg execution tools
+    # Instantly downloads and extracts standalone Linux FFmpeg paths into the instance environment
     static_ffmpeg.add_paths()
     
-    # Reads the server configuration ID number from the box above
     MY_GUILD = discord.Object(id=TEST_SERVER_ID) 
-    
     print(f"🔄 Syncing slash commands instantly to server ID: {TEST_SERVER_ID}...")
     try:
-        # Forces instant registration to your targeted server layout
         bot.tree.copy_global_to(guild=MY_GUILD)
         synced_local = await bot.tree.sync(guild=MY_GUILD)
-        
-        # Also registers globally for other servers in the background
         await bot.tree.sync() 
         print(f"✅ Success! Synced {len(synced_local)} instant server slash commands.")
     except Exception as e:
@@ -68,45 +61,51 @@ async def on_ready():
     print(f"🚀 Active Public Bot: {bot.user.name}!")
 
 
-def play_audio_stream(vc, guild_id, search_query):
-    """Core tracking background loop engine that handles repeating if enabled"""
+async def play_audio_stream(vc, guild_id, search_query):
+    """Asynchronous streaming background driver utilizing explicitly localized binary binaries"""
     loop = asyncio.get_event_loop()
     
-    with yt_dlp.YoutubeDL(YTDL_OPTIONS) as ydl:
-        try:
-            info = ydl.extract_info(search_query, download=False)
-            if 'entries' in info and len(info['entries']) > 0:
-                video_data = info['entries']
-            else:
-                video_data = info
-            audio_url = video_data['url']
-        except Exception as e:
-            print(f"Background Extraction Error on loop step: {e}")
-            return
+    # Run the blocking network extraction safely inside an isolated system executor thread
+    def extract():
+        with yt_dlp.YoutubeDL(YTDL_OPTIONS) as ydl:
+            return ydl.extract_info(search_query, download=False)
+            
+    try:
+        info = await loop.run_in_executor(None, extract)
+        if 'entries' in info and len(info['entries']) > 0:
+            video_data = info['entries'][0]
+        else:
+            video_data = info
+        audio_url = video_data['url']
+    except Exception as e:
+        print(f"Background Extraction Error: {e}")
+        return
 
     def after_playing_finished(error):
         if error:
             print(f"Playback error caught: {error}")
             
         state = server_playback_states.get(guild_id, {"loop_enabled": False, "current_search": search_query})
-        
         if state["loop_enabled"] and vc.is_connected():
             print(f"🔁 Loop active for guild {guild_id}. Restarting audio source stream.")
-            play_audio_stream(vc, guild_id, state["current_search"])
+            # Trigger the next track loop back smoothly inside the asyncio engine loop thread
+            asyncio.run_coroutine_threadsafe(play_audio_stream(vc, guild_id, state["current_search"]), loop)
 
-    vc.play(discord.FFmpegPCMAudio(audio_url, executable="ffmpeg", **FFMPEG_OPTIONS), after=after_playing_finished)
+    # Force discord.py to use static-ffmpeg's localized binary string path explicitly
+    ffmpeg_binary_path = "ffmpeg"
+    vc.play(discord.FFmpegPCMAudio(audio_url, executable=ffmpeg_binary_path, **FFMPEG_OPTIONS), after=after_playing_finished)
 
 
 # ================== GLOBAL SLASH COMMANDS ==================
 
-@bot.tree.command(name="play", description="Search, stream audio inside VC, and spawn inline video player")
+@bot.tree.command(name="play", description="Search and stream audio inside your voice channel")
 @app_commands.describe(search="Type song title or artist name")
 async def play(interaction: discord.Interaction, search: str):
     if not interaction.user.voice:
         await interaction.response.send_message("❌ You must join a voice channel first!", ephemeral=True)
         return
 
-    await interaction.response.defer()
+    await interaction.response.defer() # Acknowledges interaction immediately to stop the 3s timeout
     guild_id = interaction.guild_id
     voice_channel = interaction.user.voice.channel
 
@@ -124,12 +123,12 @@ async def play(interaction: discord.Interaction, search: str):
                 None, lambda: ydl.extract_info(search, download=False)
             )
             if 'entries' in info and len(info['entries']) > 0:
-                video_data = info['entries']
+                video_data = info['entries'][0]
             else:
                 video_data = info
 
             video_title = video_data.get('title', 'Music Video')
-            video_url = video_data.get('webpage_url', f"https://youtube.com{video_data.get('id')}")
+            video_url = video_data.get('webpage_url', f"https://youtube.com/watch?v={video_data.get('id')}")
             
     except Exception as e:
         await interaction.followup.send("❌ Search Error: Video tracking target broken or blocked.")
@@ -138,21 +137,20 @@ async def play(interaction: discord.Interaction, search: str):
     if vc.is_playing():
         vc.stop()
 
-    play_audio_stream(vc, guild_id, search)
+    await play_audio_stream(vc, guild_id, search)
 
     embed = discord.Embed(
         title=f"🎶 Now Playing: {video_title}",
-        description="Streaming audio in your Voice Channel!\nClick the integrated video layout block below to watch the track.",
+        description="Streaming audio in your Voice Channel!",
         color=discord.Color.red()
     )
     
-    await interaction.followup.send(content=f"🎥 **Video Player Link:** {video_url}", embed=embed)
+    await interaction.followup.send(content=f"🎥 **Video Link:** {video_url}", embed=embed)
 
 
 @bot.tree.command(name="loop", description="Toggle loop mode ON/OFF for the currently playing song")
 async def loop_toggle(interaction: discord.Interaction):
     guild_id = interaction.guild_id
-    
     if guild_id not in server_playback_states:
         await interaction.response.send_message("❌ Nothing is playing right now to loop!", ephemeral=True)
         return
@@ -162,9 +160,9 @@ async def loop_toggle(interaction: discord.Interaction):
     new_setting = server_playback_states[guild_id]["loop_enabled"]
 
     if new_setting:
-        await interaction.response.send_message("🔁 **Loop Mode Activated!** The current music track will repeat forever.")
+        await interaction.response.send_message("🔁 **Loop Mode Activated!**")
     else:
-        await interaction.response.send_message("➡️ **Loop Mode Deactivated!** Track repetition turned off.")
+        await interaction.response.send_message("➡️ **Loop Mode Deactivated!**")
 
 
 @bot.tree.command(name="stop", description="Stops the player and disconnects the bot")
@@ -178,10 +176,8 @@ async def stop(interaction: discord.Interaction):
         if vc.is_playing():
             vc.stop()
         await vc.disconnect()
-        await interaction.response.send_message("👋 **Stopped playback, cleared loop data, and left the channel!**")
+        await interaction.response.send_message("👋 **Stopped playback and left the channel!**")
     else:
-        await interaction.response.send_message("❌ **I am not currently inside a voice channel here!**", ephemeral=True)
+        await interaction.response.send_message("❌ **I am not inside a voice channel!**", ephemeral=True)
 
-# Securely pulls the bot token out of the cloud hosting dashboard environment
 bot.run(os.environ.get('DISCORD_TOKEN'))
-
