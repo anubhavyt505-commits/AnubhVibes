@@ -22,7 +22,7 @@ def run_web_server():
 Thread(target=run_web_server).start() 
 
 # Configuration
-TEST_SERVER_ID = 1529453134634811463  
+TEST_SERVER_ID = 1526293661300817920  
 
 intents = discord.Intents.default()
 bot = commands.Bot(command_prefix="!", intents=intents)
