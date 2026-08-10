@@ -156,36 +156,33 @@ async def play(interaction: discord.Interaction, search: str):
     voice_channel = interaction.user.voice.channel
     vc = interaction.guild.voice_client or await voice_channel.connect()
 
-    processed_search_query = apply_keyword_filter(search)
+        processed_search_query = apply_keyword_filter(search)
 
     loop_loop = asyncio.get_event_loop()
     try:
         with yt_dlp.YoutubeDL(YTDL_OPTIONS) as ydl:
             info = await loop_loop.run_in_executor(None, lambda: ydl.extract_info(processed_search_query, download=False))
             
-                       if 'entries' in info and len(info['entries']) > 0:
+            if 'entries' in info and len(info['entries']) > 0:
                 video_data = None
-                
-                # Automatically skip these unwanted variations
                 banned_keywords = ["slowed", "reverb", "remix", "bootleg", "loop", "mashup", "nightcore", "edit"]
                 
                 for entry in info['entries']:
                     if entry and 'url' in entry:
                         title_check = entry.get('title', '').lower()
-                        
-                        # If a candidate contains a bad keyword, print it and skip to the next candidate
                         if any(bad_word in title_check for bad_word in banned_keywords):
                             print(f"🗑️ Skipping remix/slowed candidate: {entry.get('title')}")
                             continue
-                            
                         video_data = entry
                         break
                         
-                # Fallback: If everything was a remix, just pick the top search result anyway
                 if not video_data:
-                    video_data = info['entries'][0]
+                    video_data = info['entries'] if len(info['entries']) > 0 else None
             else:
                 video_data = info
+
+            if not video_data:
+                raise Exception("No playable audio tracks matched the selection criteria.")
 
             video_title = video_data.get('title', 'Music Stream')
             video_url = video_data.get('webpage_url', search)
