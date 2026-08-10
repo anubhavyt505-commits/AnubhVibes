@@ -191,7 +191,6 @@ async def play(interaction: discord.Interaction, search: str):
         print(f"❌ TECHNICAL YT-DLP ERROR CAUGHT IN LOGS: {e}")
         await interaction.followup.send("❌ Search Error: Could not resolve music track. Try pasting a direct link!")
         return
-
     if vc.is_playing() or vc.is_paused():
         state["queue"].append({"title": video_title, "url": video_data['url']})
         embed = discord.Embed(
