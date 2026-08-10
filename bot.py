@@ -142,7 +142,7 @@ async def play_audio_stream(vc, guild_id, audio_target):
 # ================== GLOBAL SLASH COMMANDS ==================
 
 @bot.tree.command(name="play", description="Add a track link or song name to the active music queue")
-@app_commands.describe(search="Paste direct link or type title")
+@app_commands.describe(search="Type song title or artist name")
 async def play(interaction: discord.Interaction, search: str):
     if not interaction.user.voice:
         await interaction.response.send_message("❌ You must join a voice channel first!", ephemeral=True)
@@ -156,7 +156,9 @@ async def play(interaction: discord.Interaction, search: str):
     voice_channel = interaction.user.voice.channel
     vc = interaction.guild.voice_client or await voice_channel.connect()
 
-        processed_search_query = apply_keyword_filter(search)
+    # Ensure this line has EXACTLY 4 spaces of indentation from the left margin
+    processed_search_query = apply_keyword_filter(search)
+
 
     loop_loop = asyncio.get_event_loop()
     try:
