@@ -77,16 +77,18 @@ def init_guild_state(guild_id):
 
 def apply_keyword_filter(user_query: str) -> str:
     """
-    Automated Keyword System: Detects raw links vs text queries.
-    If it's text, it automatically appends filtering keys to target music tracks.
+    Automated Keyword System V2: Detects raw links vs text queries.
+    Appends optimized terms to force SoundCloud to target high-fidelity uploads.
     """
     if user_query.startswith("http://") or user_query.startswith("https://"):
         return user_query
         
     cleaned_query = user_query.strip().lower()
-    keywords_to_add = " track audio"
     
-    if any(word in cleaned_query for word in ["remix", "cover", "lyrics", "official", "audio"]):
+    # Target original versions instead of generic track labels
+    keywords_to_add = " original version"
+    
+    if any(word in cleaned_query for word in ["remix", "cover", "lyrics", "official", "audio", "slowed", "reverb"]):
         return user_query
         
     optimized_search = user_query + keywords_to_add
@@ -161,14 +163,27 @@ async def play(interaction: discord.Interaction, search: str):
         with yt_dlp.YoutubeDL(YTDL_OPTIONS) as ydl:
             info = await loop_loop.run_in_executor(None, lambda: ydl.extract_info(processed_search_query, download=False))
             
-            if 'entries' in info and len(info['entries']) > 0:
+                       if 'entries' in info and len(info['entries']) > 0:
                 video_data = None
+                
+                # Automatically skip these unwanted variations
+                banned_keywords = ["slowed", "reverb", "remix", "bootleg", "loop", "mashup", "nightcore", "edit"]
+                
                 for entry in info['entries']:
                     if entry and 'url' in entry:
+                        title_check = entry.get('title', '').lower()
+                        
+                        # If a candidate contains a bad keyword, print it and skip to the next candidate
+                        if any(bad_word in title_check for bad_word in banned_keywords):
+                            print(f"🗑️ Skipping remix/slowed candidate: {entry.get('title')}")
+                            continue
+                            
                         video_data = entry
                         break
+                        
+                # Fallback: If everything was a remix, just pick the top search result anyway
                 if not video_data:
-                    raise Exception("No playable audio configurations found.")
+                    video_data = info['entries'][0]
             else:
                 video_data = info
 
