@@ -35,7 +35,7 @@ YTDL_OPTIONS = {
     'noplaylist': True,
     'quiet': True,
     'no_warnings': True,
-    'default_search': 'scsearch5',  # Pulls top 5 candidates for fallback stability
+    'default_search': 'ytsearch5',
     'source_address': '0.0.0.0',
     'nocheckcertificate': True,
     'extruct': True,
@@ -43,14 +43,15 @@ YTDL_OPTIONS = {
     'headers': {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
-        'Accept-Language': 'en-US,en;q=0.9',
+        'Accept-Language': 'en-US,en;q=0.9'
     }
 }
 
 FFMPEG_OPTIONS = {
     'before_options': '-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5',
-    'options': '-vn', 
+    'options': '-vn'
 }
+
 
 @bot.event
 async def on_ready():
