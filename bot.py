@@ -1,4 +1,5 @@
 import discord
+import re
 from discord import app_commands
 from discord.ext import commands
 import yt_dlp
@@ -142,6 +143,7 @@ async def play_audio_stream(vc, guild_id, audio_target):
 
 # ================== GLOBAL SLASH COMMANDS ==================
 
+
 @bot.tree.command(name="play", description="Add a track link or song name to the active music queue")
 @app_commands.describe(search="Type song title or artist name")
 async def play(interaction: discord.Interaction, search: str):
@@ -157,9 +159,13 @@ async def play(interaction: discord.Interaction, search: str):
     voice_channel = interaction.user.voice.channel
     vc = interaction.guild.voice_client or await voice_channel.connect()
 
-    # Ensure this line has EXACTLY 4 spaces of indentation from the left margin
+    # Apply your existing custom keyword filters
     processed_search_query = apply_keyword_filter(search)
 
+    # NEW: Detect if the input is a direct link. If NOT, prefix it for yt-dlp search
+    url_pattern = re.compile(r'^https?://(?:www\.)?(?:youtube\.com|youtu\.be|soundcloud\.com)/.+$')
+    if not url_pattern.match(processed_search_query):
+        processed_search_query = f"ytsearch5:{processed_search_query}"
 
     loop_loop = asyncio.get_event_loop()
     try:
@@ -180,7 +186,8 @@ async def play(interaction: discord.Interaction, search: str):
                         break
                         
                 if not video_data:
-                    video_data = info['entries'] if len(info['entries']) > 0 else None
+                    # Fallback to the absolute first index entry if everything got filtered out
+                    video_data = info['entries'][0] if len(info['entries']) > 0 else None
             else:
                 video_data = info
 
@@ -194,6 +201,7 @@ async def play(interaction: discord.Interaction, search: str):
         print(f"❌ TECHNICAL YT-DLP ERROR CAUGHT IN LOGS: {e}")
         await interaction.followup.send("❌ Search Error: Could not resolve music track. Try pasting a direct link!")
         return
+
     if vc.is_playing() or vc.is_paused():
         state["queue"].append({"title": video_title, "url": video_data['url']})
         embed = discord.Embed(
@@ -213,6 +221,7 @@ async def play(interaction: discord.Interaction, search: str):
             color=discord.Color.green()
         )
         await interaction.followup.send(embed=embed)
+
 
 @bot.tree.command(name="pause", description="Pause the current song")
 async def pause(interaction: discord.Interaction):
