@@ -144,8 +144,6 @@ async def play_audio_stream(vc, guild_id, audio_target):
 # ================== GLOBAL SLASH COMMANDS ==================
 
 
-import re
-
 @bot.tree.command(name="play", description="Add an original track from SoundCloud to the queue")
 @app_commands.describe(search="Type song title or artist name")
 async def play(interaction: discord.Interaction, search: str):
