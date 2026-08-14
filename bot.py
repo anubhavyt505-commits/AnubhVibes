@@ -144,7 +144,9 @@ async def play_audio_stream(vc, guild_id, audio_target):
 # ================== GLOBAL SLASH COMMANDS ==================
 
 
-@bot.tree.command(name="play", description="Add a track link or song name to the active music queue")
+import re
+
+@bot.tree.command(name="play", description="Add an original track from SoundCloud to the queue")
 @app_commands.describe(search="Type song title or artist name")
 async def play(interaction: discord.Interaction, search: str):
     if not interaction.user.voice:
@@ -161,15 +163,16 @@ async def play(interaction: discord.Interaction, search: str):
 
     search_clean = search.strip()
 
-    # 1. Check if the input is a link or a search name string
-    url_pattern = re.compile(r'^https?://(?:www\.)?(?:youtube\.com|youtu\.be|soundcloud\.com)/.+$')
+    # 1. Detect direct web links vs raw search terms
+    url_pattern = re.compile(r'^https?://(?:www\.)?(?:soundcloud\.com|youtube\.com|youtu\.be)/.+$')
     
     if url_pattern.match(search_clean):
         processed_search_query = search_clean
     else:
-        # Pass name through filter and prepend it correctly for YouTube Search
+        # Pass name through your custom keyword filter
         filtered_text = apply_keyword_filter(search_clean)
-        processed_search_query = f"ytsearch5:{filtered_text}"
+        # Force a SoundCloud search and append "official" to prioritize the original track
+        processed_search_query = f"scsearch5:{filtered_text} official"
 
     loop_loop = asyncio.get_event_loop()
     try:
@@ -177,43 +180,51 @@ async def play(interaction: discord.Interaction, search: str):
             info = await loop_loop.run_in_executor(None, lambda: ydl.extract_info(processed_search_query, download=False))
             
             if not info:
-                raise Exception("No content metadata returned from extractor.")
+                raise Exception("No metadata returned from SoundCloud search.")
 
-            # Check if yt_dlp returned multiple search candidates
+            # Process multiple search candidates
             if 'entries' in info and len(info['entries']) > 0:
                 video_data = None
-                banned_keywords = ["slowed", "reverb", "remix", "bootleg", "loop", "mashup", "nightcore", "edit"]
+                banned_keywords = ["slowed", "reverb", "remix", "bootleg", "loop", "mashup", "nightcore", "edit", "cover", "10 hour"]
                 
-                # Loop through candidates to locate the official original version
+                # Check each search result for banned words
                 for entry in info['entries']:
-                    if entry and 'url' in entry:
-                        title_check = entry.get('title', '').lower()
-                        # Skip if it is a generic user remix/edit
-                        if any(bad_word in title_check for bad_word in banned_keywords):
-                            print(f"🗑️ Skipping remix candidate: {entry.get('title')}")
+                    if entry:
+                        track_url = entry.get('url') or entry.get('webpage_url')
+                        if not track_url:
                             continue
+                            
+                        title_check = entry.get('title', '').lower()
+                        
+                        # If a banned keyword is found, discard this entry and check the next one
+                        if any(bad_word in title_check for bad_word in banned_keywords):
+                            print(f"🗑️ Filtering out edit/remix/slowed result: {entry.get('title')}")
+                            continue
+                            
+                        # If it passes the filter, this is our original song target
                         video_data = entry
                         break
                         
-                # Fix: Fallback directly to the absolute top YouTube match if everything got filtered out
+                # Absolute fallback: If every single result had a banned word, use the top result anyway
                 if not video_data:
                     video_data = info['entries'][0]
             else:
                 video_data = info
 
-            if not video_data or 'url' not in video_data:
-                raise Exception("Failed to isolate a playable audio stream url target.")
+            if not video_data:
+                raise Exception("No playable SoundCloud tracks found.")
 
-            video_title = video_data.get('title', 'Music Stream')
+            # Extract final streaming targets
+            video_title = video_data.get('title', 'SoundCloud Track')
             video_url = video_data.get('webpage_url', search_clean)
-            stream_audio_url = video_data['url']
+            stream_audio_url = video_data.get('url') or video_data.get('webpage_url')
             
     except Exception as e:
-        print(f"❌ TECHNICAL YT-DLP ERROR CAUGHT IN LOGS: {e}")
-        await interaction.followup.send("❌ Search Error: Could not resolve music track. Try pasting a direct link!")
+        print(f"❌ TECHNICAL SOUNDCLOUD ERROR: {e}")
+        await interaction.followup.send("❌ Search Error: Could not resolve original SoundCloud track.")
         return
 
-    # 2. Add to Queue or Stream Live Audio directly
+    # 2. State routing and queue handling
     if vc.is_playing() or vc.is_paused():
         state["queue"].append({"title": video_title, "url": stream_audio_url})
         embed = discord.Embed(
@@ -228,9 +239,9 @@ async def play(interaction: discord.Interaction, search: str):
         await play_audio_stream(vc, guild_id, stream_audio_url)
         
         embed = discord.Embed(
-            title=f"🎶 Now Playing",
+            title=f"🎶 Now Playing Original",
             description=f"**[{video_title}]({video_url})**",
-            color=discord.Color.green()
+            color=discord.Color.orange()
         )
         await interaction.followup.send(embed=embed)
 
